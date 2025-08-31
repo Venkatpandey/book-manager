@@ -1,0 +1,287 @@
+openapi: 3.0.3
+info:
+  title: Book Catalog API
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080
+
+paths:
+  /api/v1/books:
+    post:
+      summary: Create a book (optionally enrich by ISBN)
+      operationId: createBook
+      parameters:
+        - $ref: '#/components/parameters/Enrich'
+        - $ref: '#/components/parameters/RequireEnrichment'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BookCreate' }
+            examples:
+              basic:
+                value:
+                  title: "Clean Architecture"
+                  isbn: "9780134494166"
+                  published_year: 2017
+                  page_count: 432
+                  tags: ["software", "architecture"]
+      responses:
+        '201':
+          description: Created
+          headers:
+            Location:
+              description: URL of the created resource
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BookFull' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '502': { $ref: '#/components/responses/UpstreamFailed' }
+    get:
+      summary: List books
+      operationId: listBooks
+      parameters:
+        - $ref: '#/components/parameters/Q'
+        - $ref: '#/components/parameters/AuthorName'
+        - $ref: '#/components/parameters/Year'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaginatedBooks' }
+
+  /api/v1/books/{id}:
+    get:
+      summary: Get a book by id
+      operationId: getBookById
+      parameters:
+        - $ref: '#/components/parameters/BookId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BookFull' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      summary: Delete a book by id
+      operationId: deleteBookById
+      parameters:
+        - $ref: '#/components/parameters/BookId'
+      responses:
+        '204':
+          description: No Content
+        '404': { $ref: '#/components/responses/NotFound' }
+
+components:
+  parameters:
+    BookId:
+      name: id
+      in: path
+      required: true
+      description: Book identifier
+      schema: { type: string }
+    Enrich:
+      name: enrich
+      in: query
+      required: false
+      description: If true and an ISBN is provided, attempt external enrichment.
+      schema: { type: boolean, default: false }
+    RequireEnrichment:
+      name: require_enrichment
+      in: query
+      required: false
+      description: If true, fail when enrichment is unavailable or fails.
+      schema: { type: boolean, default: false }
+    Q:
+      name: q
+      in: query
+      required: false
+      description: Free-text search over title/subtitle.
+      schema: { type: string, minLength: 1 }
+    AuthorName:
+      name: author
+      in: query
+      required: false
+      description: Filter by author name (contains, case-insensitive).
+      schema: { type: string, minLength: 1 }
+    Year:
+      name: year
+      in: query
+      required: false
+      description: Filter by exact published year.
+      schema: { type: integer }
+    YearMin:
+      name: year_min
+      in: query
+      required: false
+      description: Minimum published year (inclusive).
+      schema: { type: integer }
+    YearMax:
+      name: year_max
+      in: query
+      required: false
+      description: Maximum published year (inclusive).
+      schema: { type: integer }
+    Tag:
+      name: tag
+      in: query
+      required: false
+      description: Filter by tag (exact match).
+      schema: { type: string }
+    Sort:
+      name: sort
+      in: query
+      required: false
+      description: >
+        Comma-separated fields. Prefix with '-' for descending.
+        Supported: title, published_year, created_at, updated_at.
+      schema: { type: string, example: "title,-created_at" }
+    Page:
+      name: page
+      in: query
+      required: false
+      schema: { type: integer, minimum: 1, default: 1 }
+    PageSize:
+      name: page_size
+      in: query
+      required: false
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+
+  schemas:
+    BookCreate:
+      type: object
+      required: [title]
+      additionalProperties: false
+      properties:
+        isbn:
+          type: string
+          description: ISBN-10 or ISBN-13 (digits and dashes allowed).
+          example: "9780134494166"
+        title:
+          type: string
+          minLength: 1
+        subtitle:
+          type: string
+        published_year:
+          type: integer
+          minimum: 1450
+          maximum: 3000
+        page_count:
+          type: integer
+          minimum: 1
+        cover_url:
+          type: string
+          format: uri
+        tags:
+          type: array
+          items: { type: string }
+        authors:
+          description: Names of authors; if enrichment is used, will be merged case-insensitively.
+          type: array
+          items: { type: string }
+    AuthorSummary:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string }
+        name: { type: string }
+    EnrichmentMeta:
+      type: object
+      required: [attempted, status]
+      properties:
+        attempted:
+          type: boolean
+        source:
+          type: string
+          enum: [openlibrary]
+          nullable: true
+        status:
+          type: string
+          enum: [ok, partial, not_requested]
+        looked_up_isbn:
+          type: string
+          nullable: true
+    BookFull:
+      type: object
+      required: [id, title, authors, created_at, updated_at]
+      properties:
+        id: { type: string }
+        isbn: { type: string, nullable: true }
+        title: { type: string }
+        subtitle: { type: string, nullable: true }
+        published_year: { type: integer, nullable: true }
+        page_count: { type: integer, nullable: true }
+        cover_url: { type: string, format: uri, nullable: true }
+        tags:
+          type: array
+          items: { type: string }
+          default: []
+        authors:
+          type: array
+          items: { $ref: '#/components/schemas/AuthorSummary' }
+        enrichment:
+          $ref: '#/components/schemas/EnrichmentMeta'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    PaginatedBooks:
+      type: object
+      required: [data, page, page_size, total]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/BookFull' }
+        page:
+          type: integer
+          minimum: 1
+        page_size:
+          type: integer
+          minimum: 1
+        total:
+          type: integer
+          minimum: 0
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum: [VALIDATION, NOT_FOUND, CONFLICT, UPSTREAM]
+            message:
+              type: string
+            details:
+              type: object
+              additionalProperties: true
+
+  responses:
+    BadRequest:
+      description: Validation error
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    Conflict:
+      description: Conflict (e.g., duplicate ISBN)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    UpstreamFailed:
+      description: External enrichment failed (when required)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
