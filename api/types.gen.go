@@ -33,6 +33,22 @@ type AuthorSummary struct {
 	Name string `json:"name"`
 }
 
+// Book defines model for Book.
+type Book struct {
+	Authors       []AuthorSummary `json:"authors"`
+	CoverUrl      *string         `json:"cover_url"`
+	CreatedAt     time.Time       `json:"created_at"`
+	Enrichment    *EnrichmentMeta `json:"enrichment,omitempty"`
+	Id            string          `json:"id"`
+	Isbn          *string         `json:"isbn"`
+	PageCount     *int            `json:"page_count"`
+	PublishedYear *int            `json:"published_year"`
+	Subtitle      *string         `json:"subtitle"`
+	Tags          *[]string       `json:"tags,omitempty"`
+	Title         string          `json:"title"`
+	UpdatedAt     time.Time       `json:"updated_at"`
+}
+
 // BookCreate defines model for BookCreate.
 type BookCreate struct {
 	// Authors Names of authors; if enrichment is used, will be merged case-insensitively.
@@ -46,22 +62,6 @@ type BookCreate struct {
 	Subtitle      *string   `json:"subtitle,omitempty"`
 	Tags          *[]string `json:"tags,omitempty"`
 	Title         string    `json:"title"`
-}
-
-// BookFull defines model for BookFull.
-type BookFull struct {
-	Authors       []AuthorSummary `json:"authors"`
-	CoverUrl      *string         `json:"cover_url"`
-	CreatedAt     time.Time       `json:"created_at"`
-	Enrichment    *EnrichmentMeta `json:"enrichment,omitempty"`
-	Id            string          `json:"id"`
-	Isbn          *string         `json:"isbn"`
-	PageCount     *int            `json:"page_count"`
-	PublishedYear *int            `json:"published_year"`
-	Subtitle      *string         `json:"subtitle"`
-	Tags          *[]string       `json:"tags,omitempty"`
-	Title         string          `json:"title"`
-	UpdatedAt     time.Time       `json:"updated_at"`
 }
 
 // EnrichmentMeta defines model for EnrichmentMeta.
@@ -92,10 +92,10 @@ type ErrorResponseErrorCode string
 
 // PaginatedBooks defines model for PaginatedBooks.
 type PaginatedBooks struct {
-	Data     []BookFull `json:"data"`
-	Page     int        `json:"page"`
-	PageSize int        `json:"page_size"`
-	Total    int        `json:"total"`
+	Data     []Book `json:"data"`
+	Page     int    `json:"page"`
+	PageSize int    `json:"page_size"`
+	Total    int    `json:"total"`
 }
 
 // AuthorName defines model for AuthorName.
