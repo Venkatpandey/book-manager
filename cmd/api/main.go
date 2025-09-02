@@ -3,6 +3,8 @@ package main
 import (
 	"book-manager/api"
 	"book-manager/internal/adapter"
+	"book-manager/internal/core"
+	"flag"
 	"log"
 	"log/slog"
 	"net/http"
@@ -11,24 +13,29 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-func getenv(k, def string) string {
-	if v := os.Getenv(k); v != "" {
-		return v
-	}
-	return def
-}
-
 func main() {
-	port := getenv("PORT", "8080")
+	listenAddr := flag.String("listen", ":8080", "Listen address")
+	logLevel := flag.String("log-level", "info", "Log level")
+	flag.Parse()
 
-	r := chi.NewRouter()
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
-	h := adapter.NewHandler(nil, logger)
+	router := chi.NewRouter()
+	lvl := new(slog.LevelVar)
+	err := lvl.UnmarshalText([]byte(*logLevel))
+	if err != nil {
+		lvl.Set(slog.LevelInfo)
+	}
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: lvl,
+	}))
 
-	api.HandlerFromMux(h, r)
+	bookRepo := adapter.NewBookRepo()
+	service := core.NewService(bookRepo, nil)
+	httpHandler := adapter.NewHTTPHandler(service, logger)
 
-	log.Printf("listening on :%s", port)
-	if err := http.ListenAndServe(":"+port, r); err != nil {
+	api.HandlerFromMux(httpHandler, router)
+
+	log.Printf("listening on %s", *listenAddr)
+	if err := http.ListenAndServe(*listenAddr, router); err != nil {
 		log.Fatal(err)
 	}
 }

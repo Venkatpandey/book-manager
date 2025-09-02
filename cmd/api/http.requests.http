@@ -1,0 +1,30 @@
+# Create
+POST http://localhost:8080/api/v1/books
+Content-Type: application/json
+
+{
+  "title": "My Local Book",
+  "subtitle": "Test Subtitle",
+  "published_year": 2020,
+  "page_count": 123,
+  "tags": [
+    "go",
+    "demo"
+  ],
+  "authors": [
+    "Jane Doe"
+  ]
+}
+
+###
+GET http://localhost:8080/api/v1/books?page=1&page_size=2
+###
+GET http://localhost:8080/api/v1/books?q=architecture
+###
+GET http://localhost:8080/api/v1/books?author=Jane Doe
+###
+# Get By ID
+GET http://localhost:8080/api/v1/books/{id}
+###
+# Delete by ID
+DELETE http://localhost:8080/api/v1/books/{id}
