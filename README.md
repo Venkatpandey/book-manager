@@ -21,7 +21,7 @@ with in-memory storage and optional enrichment from the [Open Library API](https
 ```
 cmd/api           – main entrypoint
 internal/core     – domain models, service layer
-internal/adapter  – adapters (in-memory repo, HTTP, open-library clients)
+internal/adapter  – adapters (driver or driven; in-memory repo, HTTP, open-library clients)
 api               – generated OpenAPI types & server glue
 ```
 ---
@@ -45,7 +45,7 @@ Run the sample request from `cmd/api/Requests.http`, run via IDE or use [cURL](h
 ### Improvements (future extension)
 - Must Have
   - Persistent storage (e.g., PostgreSQL, Redis)
-  - Richer Open Library client (author lookups, editions)
+  - Request validation via OpenAPI middleware
 - Nice to have
   - Caching of enrichment responses
-  - Request validation via OpenAPI middleware
+  - Richer Open Library client (author lookups, editions)

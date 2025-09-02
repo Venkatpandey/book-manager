@@ -1,0 +1,114 @@
+# Create
+# curl -X POST --location "http://localhost:8080/api/v1/books"
+#    -H "Content-Type: application/json"
+#    -d '{
+#          "title": "My Local Book",
+#          "subtitle": "Test Subtitle",
+#          "published_year": 2020,
+#          "page_count": 123,
+#          "tags": [
+#            "go",
+#            "demo"
+#          ],
+#          "authors": [
+#            "Jane Doe"
+#          ]
+#        }'
+POST http://localhost:8080/api/v1/books
+Content-Type: application/json
+
+{
+  "title": "My Local Book",
+  "subtitle": "Test Subtitle",
+  "published_year": 2020,
+  "page_count": 123,
+  "tags": [
+    "go",
+    "demo"
+  ],
+  "authors": [
+    "Jane Doe"
+  ]
+}
+
+###
+# Create using openlib
+# curl -i -X POST "http://localhost:8080/api/v1/books?enrich=true"
+#  -H "Content-Type: application/json"
+#  -d '{"isbn":"9780134494166"}'
+POST http://localhost:8080/api/v1/books?enrich=true
+Content-Type: application/json
+
+{
+  "isbn": "9780134494166"
+}
+
+###
+# Create using openlib fails
+# curl -i -X POST "http://localhost:8080/api/v1/books?enrich=true&require_enrichment=true"
+#  -H "Content-Type: application/json"
+#  -d '{"isbn":"0000000000"}'
+POST http://localhost:8080/api/v1/books?enrich=true&require_enrichment=true
+Content-Type: application/json
+
+{
+  "isbn": "0000000000"
+}
+
+###
+
+#Create using user+open-lib merge
+# curl -X POST --location "http://localhost:8080/api/v1/books?enrich=true"
+#    -H "Content-Type: application/json"
+#    -d '{
+#          "isbn": "978-0-446-31078-9",
+#          "title": "My Custom Title",
+#          "tags": [
+#            "architecture",
+#            "design"
+#          ]
+#        }'
+POST http://localhost:8080/api/v1/books?enrich=true
+Content-Type: application/json
+
+{
+  "isbn": "978-0-446-31078-9",
+  "title": "My Custom Title",
+  "tags": [
+    "architecture",
+    "design"
+  ]
+}
+
+###
+# curl -X GET --location "http://localhost:8080/api/v1/books?q=architecture"
+GET http://localhost:8080/api/v1/books?q=architecture
+
+###
+
+
+###
+# curl -X GET --location "http://localhost:8080/api/v1/books?q=architecture"
+GET http://localhost:8080/api/v1/books?q=architecture
+
+###
+
+
+###
+# curl -X GET --location "http://localhost:8080/api/v1/books?author=Jane+Doe"
+GET http://localhost:8080/api/v1/books?author=Jane+Doe
+
+###
+
+
+###
+# Get By ID - Replace {id} with actual id
+#curl -X GET --location "http://localhost:8080/api/v1/books/{id}"
+GET http://localhost:8080/api/v1/books/{id}
+###
+
+# Delete by ID
+# curl -X DELETE --location "http://localhost:8080/api/v1/books/e8f506eb-8f2b-4fa2-afd9-7d0087da2568"
+DELETE http://localhost:8080/api/v1/books/e8f506eb-8f2b-4fa2-afd9-7d0087da2568
+
+###

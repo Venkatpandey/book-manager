@@ -4,6 +4,7 @@ import (
 	"book-manager/api"
 	"book-manager/internal/adapter"
 	"book-manager/internal/core"
+	"book-manager/pkg/http_client"
 	"flag"
 	"log"
 	"log/slog"
@@ -16,6 +17,7 @@ import (
 func main() {
 	listenAddr := flag.String("listen", ":8080", "Listen address")
 	logLevel := flag.String("log-level", "info", "Log level")
+	extBaseURL := flag.String("ext-base-url", "https://openlibrary.org", "External base url")
 	flag.Parse()
 
 	router := chi.NewRouter()
@@ -29,7 +31,8 @@ func main() {
 	}))
 
 	bookRepo := adapter.NewBookRepo()
-	service := core.NewService(bookRepo, nil)
+	enrich := adapter.NewOpenLibraryClient(*extBaseURL, 3, http_client.CreateHTTPClient())
+	service := core.NewService(bookRepo, enrich)
 	httpHandler := adapter.NewHTTPHandler(service, logger)
 
 	api.HandlerFromMux(httpHandler, router)
