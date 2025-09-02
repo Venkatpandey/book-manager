@@ -107,11 +107,23 @@ type BookId = string
 // Enrich defines model for Enrich.
 type Enrich = bool
 
+// Page defines model for Page.
+type Page = int
+
+// PageSize defines model for PageSize.
+type PageSize = int
+
 // Q defines model for Q.
 type Q = string
 
 // RequireEnrichment defines model for RequireEnrichment.
 type RequireEnrichment = bool
+
+// Sort defines model for Sort.
+type Sort = string
+
+// Tag defines model for Tag.
+type Tag = string
 
 // Year defines model for Year.
 type Year = int
@@ -138,6 +150,14 @@ type ListBooksParams struct {
 
 	// Year Filter by exact published year.
 	Year *Year `form:"year,omitempty" json:"year,omitempty"`
+
+	// Tag Filter by tag (exact match).
+	Tag *Tag `form:"tag,omitempty" json:"tag,omitempty"`
+
+	// Sort Comma-separated fields. Prefix with '-' for descending. Supported: title, published_year, created_at, updated_at.
+	Sort     *Sort     `form:"sort,omitempty" json:"sort,omitempty"`
+	Page     *Page     `form:"page,omitempty" json:"page,omitempty"`
+	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
 }
 
 // CreateBookParams defines parameters for CreateBook.
