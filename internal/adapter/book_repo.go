@@ -24,7 +24,7 @@ func NewBookRepo() *BookRepo {
 	return &BookRepo{byID: make(map[string]model.Book), byISBN: make(map[string]string)}
 }
 
-func (r *BookRepo) Create(ctx context.Context, b model.Book) (model.Book, error) {
+func (r *BookRepo) Create(_ context.Context, b model.Book) (model.Book, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -48,7 +48,7 @@ func (r *BookRepo) Create(ctx context.Context, b model.Book) (model.Book, error)
 	return copyBook(b), nil
 }
 
-func (r *BookRepo) GetByID(ctx context.Context, id string) (model.Book, error) {
+func (r *BookRepo) GetByID(_ context.Context, id string) (model.Book, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	b, ok := r.byID[id]
@@ -58,7 +58,7 @@ func (r *BookRepo) GetByID(ctx context.Context, id string) (model.Book, error) {
 	return copyBook(b), nil
 }
 
-func (r *BookRepo) GetByISBN(ctx context.Context, isbn string) (model.Book, error) {
+func (r *BookRepo) GetByISBN(_ context.Context, isbn string) (model.Book, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	key := normalizeISBN(isbn)
@@ -73,7 +73,15 @@ func (r *BookRepo) GetByISBN(ctx context.Context, isbn string) (model.Book, erro
 	return copyBook(b), nil
 }
 
-func (r *BookRepo) List(ctx context.Context, q model.ListQuery) (model.Page[model.Book], error) {
+// List returns a paginated slice of books matching the query.
+// The flow is:
+//
+//  1. Snapshot all books from the in-memory store (thread-safe copy).
+//  2. Apply filters (title/subtitle full-text, author, tag, year, etc.).
+//  3. Sort the filtered books according to the provided sort keys
+//     (supports multi-field, ASC/DESC). Defaults to created_at DESC.
+//  4. Apply pagination (page / page_size).
+func (r *BookRepo) List(_ context.Context, q model.ListQuery) (model.Page[model.Book], error) {
 	r.mu.RLock()
 	// snapshot ids to avoid holding lock during sort
 	items := make([]model.Book, 0, len(r.byID))
@@ -118,7 +126,7 @@ func (r *BookRepo) List(ctx context.Context, q model.ListQuery) (model.Page[mode
 	return model.Page[model.Book]{Data: paged, Page: page, PageSize: size, Total: total}, nil
 }
 
-func (r *BookRepo) Delete(ctx context.Context, id string) error {
+func (r *BookRepo) Delete(_ context.Context, id string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	b, ok := r.byID[id]
@@ -133,8 +141,6 @@ func (r *BookRepo) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-// helpers
-
 func copyBook(b model.Book) model.Book {
 	b.Tags = append([]string(nil), b.Tags...)
 	b.Authors = append([]string(nil), b.Authors...)
@@ -147,18 +153,24 @@ func normalizeISBN(s string) string {
 	return s
 }
 
+// matchFilters checks whether a book matches the given query filters.
 func matchFilters(b model.Book, q model.ListQuery) bool {
+	// Full-text search: title or subtitle contains the query (case-insensitive)
+	// q: title or subtitle contains (case-insensitive)
 	if q.Q != nil {
 		needle := strings.ToLower(*q.Q)
-		t := strings.ToLower(b.Title)
-		sub := ""
-		if b.Subtitle != nil {
-			sub = strings.ToLower(*b.Subtitle)
-		}
-		if !strings.Contains(t, needle) && !strings.Contains(sub, needle) {
-			return false
+		if !strings.Contains(strings.ToLower(b.Title), needle) {
+			sub := ""
+			if b.Subtitle != nil {
+				sub = strings.ToLower(*b.Subtitle)
+			}
+			if !strings.Contains(sub, needle) {
+				return false
+			}
 		}
 	}
+
+	// author: any author contains (case-insensitive)
 	if q.Author != nil {
 		needle := strings.ToLower(*q.Author)
 		found := false
@@ -172,6 +184,8 @@ func matchFilters(b model.Book, q model.ListQuery) bool {
 			return false
 		}
 	}
+
+	// tag: exact match
 	if q.Tag != nil {
 		found := false
 		for _, t := range b.Tags {
@@ -184,6 +198,8 @@ func matchFilters(b model.Book, q model.ListQuery) bool {
 			return false
 		}
 	}
+
+	// year: exact
 	if q.Year != nil {
 		if b.PublishedYear == nil || *b.PublishedYear != *q.Year {
 			return false
@@ -192,41 +208,17 @@ func matchFilters(b model.Book, q model.ListQuery) bool {
 	return true
 }
 
-func cmpPtrInt(a, b *int) int {
-	if a == nil && b == nil {
-		return 0
-	}
-	if a == nil {
-		return -1
-	}
-	if b == nil {
-		return 1
-	}
-	if *a < *b {
-		return -1
-	}
-	if *a > *b {
-		return 1
-	}
-	return 0
-}
-
-func cmpTime(a, b model.Book) int {
-	if a.CreatedAt.Before(b.CreatedAt) {
-		return -1
-	}
-	if a.CreatedAt.After(b.CreatedAt) {
-		return 1
-	}
-	return 0
-}
-
+// sortBooks sorts books in-place by the provided sort keys.
+// Supports multiple fields (title, published_year, created_at, updated_at).
+// Falls back to ID for stability.
 func sortBooks(bs []model.Book, keys []model.SortKey) {
 	if len(keys) == 0 {
 		// default: created_at desc
 		sort.Slice(bs, func(i, j int) bool { return bs[i].CreatedAt.After(bs[j].CreatedAt) })
 		return
 	}
+
+	// Apply multi-key sorting, respecting ASC/DESC
 	sort.SliceStable(bs, func(i, j int) bool {
 		for _, k := range keys {
 			switch k.Field {
@@ -238,20 +230,34 @@ func sortBooks(bs []model.Book, keys []model.SortKey) {
 					return bs[i].Title < bs[j].Title
 				}
 			case "published_year":
-				c := cmpPtrInt(bs[i].PublishedYear, bs[j].PublishedYear)
-				if c != 0 {
+				ai, bi := bs[i].PublishedYear, bs[j].PublishedYear
+				switch {
+				case ai == nil && bi == nil:
+					// equal, continue to next key
+				case ai == nil:
 					if k.Desc {
-						return c > 0
+						return false
+					} // nil < val
+					return true
+				case bi == nil:
+					if k.Desc {
+						return true
 					}
-					return c < 0
+					return false
+				default:
+					if *ai != *bi {
+						if k.Desc {
+							return *ai > *bi
+						}
+						return *ai < *bi
+					}
 				}
 			case "created_at":
-				c := cmpTime(bs[i], bs[j])
-				if c != 0 {
+				if !bs[i].CreatedAt.Equal(bs[j].CreatedAt) {
 					if k.Desc {
-						return c > 0
+						return bs[i].CreatedAt.After(bs[j].CreatedAt)
 					}
-					return c < 0
+					return bs[i].CreatedAt.Before(bs[j].CreatedAt)
 				}
 			case "updated_at":
 				if !bs[i].UpdatedAt.Equal(bs[j].UpdatedAt) {
@@ -262,7 +268,7 @@ func sortBooks(bs []model.Book, keys []model.SortKey) {
 				}
 			}
 		}
-		// tie-breaker by ID for stability
+		// sort by ID for deterministic ordering
 		return bs[i].ID < bs[j].ID
 	})
 }
