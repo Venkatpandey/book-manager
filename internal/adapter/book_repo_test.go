@@ -61,19 +61,16 @@ func TestListFiltersAndPagination(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	qq := "go"
-	page, err := r.List(ctx, model.ListQuery{Q: &qq, Page: 1, PageSize: 10})
+	page, err := r.List(ctx, model.ListQuery{Q: util.GetPtr("go"), Page: 1, PageSize: 10})
 	require.NoError(t, err)
 	assert.Len(t, page.Data, 2)
 
-	a := "alan"
-	page, err = r.List(ctx, model.ListQuery{Author: &a, Page: 1, PageSize: 10})
+	page, err = r.List(ctx, model.ListQuery{Author: util.GetPtr("alan"), Page: 1, PageSize: 10})
 	require.NoError(t, err)
 	require.Len(t, page.Data, 1)
 	assert.Equal(t, "b2", page.Data[0].ID)
 
-	tag := "ddd"
-	page, err = r.List(ctx, model.ListQuery{Tag: &tag, Page: 1, PageSize: 10})
+	page, err = r.List(ctx, model.ListQuery{Tag: util.GetPtr("ddd"), Page: 1, PageSize: 10})
 	require.NoError(t, err)
 	require.Len(t, page.Data, 1)
 	assert.Equal(t, "b4", page.Data[0].ID)

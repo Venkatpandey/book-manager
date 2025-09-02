@@ -1,6 +1,11 @@
 package model
 
-import "time"
+import (
+	"errors"
+	"time"
+)
+
+// All core models live here together for simplicity.
 
 type EnrichmentStatus string
 
@@ -8,6 +13,13 @@ const (
 	EnrichmentNotRequested EnrichmentStatus = "not_requested"
 	EnrichmentOK           EnrichmentStatus = "ok"
 	EnrichmentPartial      EnrichmentStatus = "partial"
+)
+
+var (
+	ErrValidation = errors.New("validation")
+	ErrConflict   = errors.New("conflict")
+	ErrNotFound   = errors.New("not_found")
+	ErrUpstream   = errors.New("upstream")
 )
 
 type EnrichmentMeta struct {

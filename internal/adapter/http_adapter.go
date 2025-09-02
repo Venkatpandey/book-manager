@@ -11,13 +11,6 @@ import (
 	"strings"
 )
 
-var (
-	ErrValidation = errors.New("validation")
-	ErrConflict   = errors.New("conflict")
-	ErrNotFound   = errors.New("not_found")
-	ErrUpstream   = errors.New("upstream")
-)
-
 type BookService interface {
 	CreateBook(ctx context.Context, in model.CreateBookInput) (model.Book, error)
 	ListBooks(ctx context.Context, q model.ListQuery) (model.Page[model.Book], error)
@@ -246,13 +239,13 @@ func writeErr(w http.ResponseWriter, status int, code, msg string, det map[strin
 
 func mapSvcErr(err error) (int, string) {
 	switch {
-	case errors.Is(err, ErrValidation):
+	case errors.Is(err, model.ErrValidation):
 		return http.StatusBadRequest, "VALIDATION"
-	case errors.Is(err, ErrConflict):
+	case errors.Is(err, model.ErrConflict):
 		return http.StatusConflict, "CONFLICT"
-	case errors.Is(err, ErrNotFound):
+	case errors.Is(err, model.ErrNotFound):
 		return http.StatusNotFound, "NOT_FOUND"
-	case errors.Is(err, ErrUpstream):
+	case errors.Is(err, model.ErrUpstream):
 		return http.StatusBadGateway, "UPSTREAM"
 	default:
 		return http.StatusInternalServerError, "INTERNAL"

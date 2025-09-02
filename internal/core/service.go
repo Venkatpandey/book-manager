@@ -54,8 +54,8 @@ func (s *Service) CreateBook(ctx context.Context, in model.CreateBookInput) (mod
 		PublishedYear: in.PublishedYear,
 		PageCount:     in.PageCount,
 		CoverURL:      in.CoverURL,
-		Tags:          append([]string(nil), in.Tags...),
-		Authors:       append([]string(nil), in.Authors...),
+		Tags:          in.Tags,
+		Authors:       in.Authors,
 		Enrichment:    model.EnrichmentMeta{Attempted: false, Status: model.EnrichmentNotRequested},
 		CreatedAt:     time.Now(),
 		UpdatedAt:     time.Now(),
@@ -112,7 +112,6 @@ func (s *Service) DeleteBook(ctx context.Context, id string) error {
 	return nil
 }
 
-// helpers
 func valueOr(p *string, def string) string {
 	if p == nil {
 		return def

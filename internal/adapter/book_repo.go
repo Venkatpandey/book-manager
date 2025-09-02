@@ -44,7 +44,7 @@ func (r *BookRepo) Create(_ context.Context, b model.Book) (model.Book, error) {
 			r.byISBN[key] = b.ID
 		}
 	}
-	r.byID[b.ID] = copyBook(b)
+	r.byID[b.ID] = b
 	return copyBook(b), nil
 }
 
@@ -141,6 +141,7 @@ func (r *BookRepo) Delete(_ context.Context, id string) error {
 	return nil
 }
 
+// safe copy for slices
 func copyBook(b model.Book) model.Book {
 	b.Tags = append([]string(nil), b.Tags...)
 	b.Authors = append([]string(nil), b.Authors...)

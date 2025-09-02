@@ -6,6 +6,7 @@ import (
 	"book-manager/api"
 	"book-manager/internal/core"
 	"book-manager/internal/core/model"
+	"book-manager/pkg/util"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -18,25 +19,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-// test wiring: handler + real in-memory service (no network)
-func newServer(t *testing.T) (http.Handler, *core.Service) {
-	t.Helper()
-	repo := NewBookRepo()
-	svc := core.NewService(repo, mockEnrich{})
-	logger := slog.New(slog.NewTextHandler(httptest.NewRecorder(), nil))
-	h := NewHTTPHandler(svc, logger)
-
-	r := chi.NewRouter()
-	api.HandlerFromMux(h, r)
-	return r, svc
-}
-
-type mockEnrich struct{}
-
-func (mockEnrich) FetchByISBN(_ context.Context, _ string) (book model.EnrichedBook, err error) {
-	return model.EnrichedBook{}, nil
-}
 
 func TestCreateBook_201(t *testing.T) {
 	h, _ := newServer(t)
@@ -61,9 +43,8 @@ func TestCreateBook_201(t *testing.T) {
 
 func TestGetBook_200_and_404(t *testing.T) {
 	h, svc := newServer(t)
-	// seed via service for convenience
-	title := "Seed"
-	b, err := svc.CreateBook(context.Background(), model.CreateBookInput{Title: &title})
+	// pre-populate data
+	b, err := svc.CreateBook(context.Background(), model.CreateBookInput{Title: util.GetPtr("Seed")})
 	require.NoError(t, err)
 
 	// existing
@@ -84,10 +65,10 @@ func TestGetBook_200_and_404(t *testing.T) {
 
 func TestListBooks_Pagination(t *testing.T) {
 	h, svc := newServer(t)
-	// seed 3
+	// populate seed data
 	for i := 1; i <= 3; i++ {
 		title := "B" + string(rune('0'+i))
-		_, err := svc.CreateBook(context.Background(), model.CreateBookInput{Title: &title})
+		_, err := svc.CreateBook(context.Background(), model.CreateBookInput{Title: util.GetPtr(title)})
 		require.NoError(t, err)
 	}
 
@@ -106,8 +87,8 @@ func TestListBooks_Pagination(t *testing.T) {
 
 func TestDeleteBook_204_then_404(t *testing.T) {
 	h, svc := newServer(t)
-	title := "Temp"
-	b, err := svc.CreateBook(context.Background(), model.CreateBookInput{Title: &title})
+
+	b, err := svc.CreateBook(context.Background(), model.CreateBookInput{Title: util.GetPtr("Temp")})
 	require.NoError(t, err)
 
 	r := httptest.NewRequest(http.MethodDelete, "/api/v1/books/"+b.ID, nil)
@@ -123,10 +104,30 @@ func TestDeleteBook_204_then_404(t *testing.T) {
 
 func TestCreateBook_Validation400(t *testing.T) {
 	h, _ := newServer(t)
-	// empty body → invalid JSON or missing title
+
+	// invalid input
 	r := httptest.NewRequest(http.MethodPost, "/api/v1/books", bytes.NewReader([]byte(`{}`)))
 	r.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+// create test server
+func newServer(t *testing.T) (http.Handler, *core.Service) {
+	t.Helper()
+	repo := NewBookRepo()
+	svc := core.NewService(repo, mockEnrich{})
+	logger := slog.New(slog.NewTextHandler(httptest.NewRecorder(), nil))
+	h := NewHTTPHandler(svc, logger)
+
+	r := chi.NewRouter()
+	api.HandlerFromMux(h, r)
+	return r, svc
+}
+
+type mockEnrich struct{}
+
+func (mockEnrich) FetchByISBN(_ context.Context, _ string) (book model.EnrichedBook, err error) {
+	return model.EnrichedBook{}, nil
 }
