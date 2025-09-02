@@ -3,7 +3,6 @@ package core
 import (
 	"book-manager/internal/core/model"
 	"context"
-	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -21,13 +20,6 @@ type EnrichmentClient interface {
 	FetchByISBN(ctx context.Context, isbn string) (model.EnrichedBook, error)
 }
 
-var (
-	ErrValidation = errors.New("validation")
-	ErrConflict   = errors.New("conflict")
-	ErrNotFound   = errors.New("not_found")
-	ErrUpstream   = errors.New("upstream")
-)
-
 type Service struct {
 	Repo   BookRepository
 	Enrich EnrichmentClient
@@ -41,16 +33,16 @@ func (s *Service) CreateBook(ctx context.Context, in model.CreateBookInput) (mod
 	// basic validation
 	if !in.Enrich || in.ISBN == nil {
 		if in.Title == nil || *in.Title == "" {
-			return model.Book{}, ErrValidation
+			return model.Book{}, model.ErrValidation
 		}
 	}
 	if in.PageCount != nil && *in.PageCount < 1 {
-		return model.Book{}, ErrValidation
+		return model.Book{}, model.ErrValidation
 	}
 	if in.PublishedYear != nil {
 		y := *in.PublishedYear
 		if y < 1450 || y > 3000 {
-			return model.Book{}, ErrValidation
+			return model.Book{}, model.ErrValidation
 		}
 	}
 
@@ -77,7 +69,7 @@ func (s *Service) CreateBook(ctx context.Context, in model.CreateBookInput) (mod
 		res, err := s.Enrich.FetchByISBN(ctx, *in.ISBN)
 		if err != nil {
 			if in.RequireEnrichment {
-				return model.Book{}, ErrUpstream
+				return model.Book{}, model.ErrUpstream
 			}
 			b.Enrichment.Status = model.EnrichmentPartial
 		} else {
@@ -89,7 +81,7 @@ func (s *Service) CreateBook(ctx context.Context, in model.CreateBookInput) (mod
 	// duplicate ISBN protection via repo (GetByISBN) before create
 	if b.ISBN != nil && *b.ISBN != "" {
 		if _, err := s.Repo.GetByISBN(ctx, *b.ISBN); err == nil {
-			return model.Book{}, ErrConflict
+			return model.Book{}, model.ErrConflict
 		}
 	}
 
@@ -108,14 +100,14 @@ func (s *Service) ListBooks(ctx context.Context, q model.ListQuery) (model.Page[
 func (s *Service) GetBook(ctx context.Context, id string) (model.Book, error) {
 	b, err := s.Repo.GetByID(ctx, id)
 	if err != nil {
-		return model.Book{}, ErrNotFound
+		return model.Book{}, model.ErrNotFound
 	}
 	return b, nil
 }
 
 func (s *Service) DeleteBook(ctx context.Context, id string) error {
 	if err := s.Repo.Delete(ctx, id); err != nil {
-		return ErrNotFound
+		return model.ErrNotFound
 	}
 	return nil
 }

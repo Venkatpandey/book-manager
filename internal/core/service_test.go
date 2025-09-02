@@ -1,3 +1,5 @@
+//go:build unit
+
 package core
 
 import (
@@ -5,7 +7,10 @@ import (
 	"book-manager/internal/core/model"
 	"book-manager/pkg/util"
 	"context"
+	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -51,7 +56,7 @@ func TestCreate_EnrichMiss_RequireTrue_Fails(t *testing.T) {
 	isbn := "9780134494166"
 	_, err := svc.CreateBook(context.Background(), model.CreateBookInput{ISBN: &isbn, Enrich: true, RequireEnrichment: true})
 	require.Error(t, err)
-	assert.Equal(t, ErrUpstream, err)
+	assert.Equal(t, model.ErrUpstream, err)
 }
 
 func TestDuplicateISBN_Fails(t *testing.T) {
@@ -75,6 +80,51 @@ func TestGetAndDelete(t *testing.T) {
 	assert.Equal(t, b.ID, got.ID)
 	require.NoError(t, svc.DeleteBook(context.Background(), b.ID))
 	_, err = svc.GetBook(context.Background(), b.ID)
+	require.Error(t, err)
+}
+
+func TestService_Create_WithEnrichment_OK(t *testing.T) {
+	// Mock Open Library server
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/isbn/9780134494166.json" {
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"title":           "Clean Architecture",
+				"number_of_pages": 400,
+				"publish_date":    "2020",
+				"covers":          []int{5555},
+				"authors":         []map[string]any{{"name": "Robert C. Martin"}},
+			})
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer ts.Close()
+
+	repo := adapter.NewBookRepo()
+	client := adapter.NewOpenLibraryClient(ts.URL, 1, http.DefaultClient)
+	svc := NewService(repo, client)
+
+	isbn := "9780134494166"
+	out, err := svc.CreateBook(context.Background(), model.CreateBookInput{ISBN: &isbn, Enrich: true})
+	require.NoError(t, err)
+	assert.Equal(t, "Clean Architecture", out.Title)
+	assert.Equal(t, "ok", string(out.Enrichment.Status))
+	require.NotNil(t, out.PageCount)
+	assert.Equal(t, 400, *out.PageCount)
+	require.NotNil(t, out.PublishedYear)
+	assert.Equal(t, 2020, *out.PublishedYear)
+}
+
+func TestService_Create_WithEnrichment_RequireTrue_404Fails(t *testing.T) {
+	ts := httptest.NewServer(http.NotFoundHandler())
+	defer ts.Close()
+
+	repo := adapter.NewBookRepo()
+	client := adapter.NewOpenLibraryClient(ts.URL, 1, http.DefaultClient)
+	svc := NewService(repo, client)
+
+	isbn := "0000000000"
+	_, err := svc.CreateBook(context.Background(), model.CreateBookInput{ISBN: &isbn, Enrich: true, RequireEnrichment: true})
 	require.Error(t, err)
 }
 
