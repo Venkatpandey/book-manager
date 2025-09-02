@@ -2,7 +2,6 @@ package adapter
 
 import (
 	"book-manager/api"
-	"book-manager/internal/core"
 	"book-manager/internal/core/model"
 	"context"
 	"encoding/json"
@@ -10,6 +9,13 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+)
+
+var (
+	ErrValidation = errors.New("validation")
+	ErrConflict   = errors.New("conflict")
+	ErrNotFound   = errors.New("not_found")
+	ErrUpstream   = errors.New("upstream")
 )
 
 type BookService interface {
@@ -36,7 +42,7 @@ func (h *HTTPHandler) CreateBook(w http.ResponseWriter, r *http.Request, _ api.C
 	var in api.BookCreate
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 		writeErr(w, http.StatusBadRequest, "VALIDATION", "invalid JSON body", map[string]any{"cause": err.Error()})
-		h.log.With(err).Info("invalid JSON body")
+		h.log.With("error", err).Info("invalid JSON body")
 		return
 	}
 	din := toCreateInput(in, enrich, require)
@@ -44,7 +50,7 @@ func (h *HTTPHandler) CreateBook(w http.ResponseWriter, r *http.Request, _ api.C
 	if err != nil {
 		status, code := mapSvcErr(err)
 		writeErr(w, status, code, err.Error(), nil)
-		h.log.With(err).Info("create book failed")
+		h.log.With("error", err).Info("create book failed")
 		return
 	}
 	out := fromDomainBook(b)
@@ -58,7 +64,7 @@ func (h *HTTPHandler) ListBooks(w http.ResponseWriter, r *http.Request, p api.Li
 	page, err := h.Svc.ListBooks(r.Context(), q)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, "INTERNAL", err.Error(), nil)
-		h.log.With(err).Info("list books failed")
+		h.log.With("error", err).Info("list books failed")
 		return
 	}
 	writeJSON(w, http.StatusOK, fromDomainPage(page))
@@ -68,7 +74,7 @@ func (h *HTTPHandler) GetBookById(w http.ResponseWriter, r *http.Request, id str
 	b, err := h.Svc.GetBook(r.Context(), id)
 	if err != nil {
 		writeErr(w, http.StatusNotFound, "NOT_FOUND", "book not found", nil)
-		h.log.With(err).Info("get book failed")
+		h.log.With("error", err).Info("get book failed")
 		return
 	}
 	writeJSON(w, http.StatusOK, fromDomainBook(b))
@@ -77,7 +83,7 @@ func (h *HTTPHandler) GetBookById(w http.ResponseWriter, r *http.Request, id str
 func (h *HTTPHandler) DeleteBookById(w http.ResponseWriter, r *http.Request, id string) {
 	if err := h.Svc.DeleteBook(r.Context(), id); err != nil {
 		writeErr(w, http.StatusNotFound, "NOT_FOUND", "book not found", nil)
-		h.log.With(err).Info("delete book failed")
+		h.log.With("error", err).Info("delete book failed")
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -240,13 +246,13 @@ func writeErr(w http.ResponseWriter, status int, code, msg string, det map[strin
 
 func mapSvcErr(err error) (int, string) {
 	switch {
-	case errors.Is(err, core.ErrValidation):
+	case errors.Is(err, ErrValidation):
 		return http.StatusBadRequest, "VALIDATION"
-	case errors.Is(err, core.ErrConflict):
+	case errors.Is(err, ErrConflict):
 		return http.StatusConflict, "CONFLICT"
-	case errors.Is(err, core.ErrNotFound):
+	case errors.Is(err, ErrNotFound):
 		return http.StatusNotFound, "NOT_FOUND"
-	case errors.Is(err, core.ErrUpstream):
+	case errors.Is(err, ErrUpstream):
 		return http.StatusBadGateway, "UPSTREAM"
 	default:
 		return http.StatusInternalServerError, "INTERNAL"
